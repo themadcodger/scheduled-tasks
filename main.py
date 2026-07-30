@@ -13,26 +13,71 @@ import smtplib
 import os
 
 # import os and use it to get the Github repository secrets
-MY_EMAIL = os.environ.get("MY_EMAIL")
-MY_PASSWORD = os.environ.get("MY_PASSWORD")
+SENDER_EMAIL = os.environ.get("MY_EMAIL")
+SENDER_PASSWORD = os.environ.get("MY_PASSWORD")
 
-today = datetime.now()
-today_tuple = (today.month, today.day)
+# --- Configuration ---
+SMTP_SERVER = 'smtp.fastmail.com'
+PORT = 587 # or 465 for SSL
+SUBJECT = 'Random Unrelated Email'
+
+
+def sendmail():
+    try:
+        print(f"Connecting to {SMTP_SERVER}:{PORT}...")
+
+        # 1. Connect to the server
+        server = smtplib.SMTP(SMTP_SERVER, PORT)
+        server.starttls()  # Secure the connection
+
+        # 2. Log in
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        print("Login successful.")
+
+        # 3. Send the email
+        print(f"Attempting to send mail to {email}...")
+        server.sendmail(SENDER_EMAIL, [email], msg.as_string())
+        print("Email sent successfully!")
+
+    except smtplib.SMTPDataError as e:
+        # This block handles the server rejecting the message content
+        print("\n **SMTPDataError Occurred!** ")
+        print(f"Server Code: {e.smtp_code}")
+        # The server's human-readable error message
+        print(f"Server Message: {e.smtp_error.decode('utf-8')}")
+        print("Possible causes: Recipient/Sender mismatch, invalid recipient, or content issues.")
+
+    except smtplib.SMTPAuthenticationError:
+        print(" Authentication failed. Check your username/password or App Password.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+    finally:
+        if 'server' in locals():
+            server.quit()
+            print("Connection closed.")
+
+now = dt.datetime.now()
+current_month = now.month
+current_day = now.day
 
 data = pandas.read_csv("birthdays.csv")
-birthdays_dict = {(data_row["month"], data_row["day"])                  : data_row for (index, data_row) in data.iterrows()}
-if today_tuple in birthdays_dict:
-    birthday_person = birthdays_dict[today_tuple]
-    file_path = f"letter_templates/letter_{random.randint(1, 3)}.txt"
-    with open(file_path) as letter_file:
-        contents = letter_file.read()
-        contents = contents.replace("[NAME]", birthday_person["name"])
+birthdays = data.to_dict(orient="records")
+for entry in birthdays:
+    if entry["month"] == current_month and entry["day"] == current_day:
+        name = entry["name"]
+        email = entry["email"]
 
-    with smtplib.SMTP("YOUR EMAIL PROVIDER SMTP SERVER ADDRESS") as connection:
-        connection.starttls()
-        connection.login(MY_EMAIL, MY_PASSWORD)
-        connection.sendmail(
-            from_addr=MY_EMAIL,
-            to_addrs=birthday_person["email"],
-            msg=f"Subject:Happy Birthday!\n\n{contents}"
-        )
+        with open(f"letter_templates/letter_{randint(1,3)}.txt") as file:
+            contents = file.read()
+            contents = contents.replace("[NAME]", name)
+
+
+        # --- Construct the message ---
+        msg = MIMEText(contents)
+        msg['Subject'] = SUBJECT
+        # CRITICAL: This 'From' address should match SENDER_EMAIL
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = email
+
+        sendmail()
